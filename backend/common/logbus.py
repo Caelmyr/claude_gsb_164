@@ -33,10 +33,15 @@ class LogBus:
         stage: str = "master",
         task_id: str = "job",
         worker_id: str = "",
+        ts_ms: Optional[int] = None,
         **extra: Any,
     ) -> dict:
         record: dict[str, Any] = {
-            "ts": now_ms(),
+            # Canonical field name is ``ts_ms`` (epoch milliseconds); a caller
+            # (e.g. a worker forwarding a log) may supply its own timestamp so
+            # ordering reflects when the event actually happened, not when the
+            # master received it.
+            "ts_ms": int(ts_ms) if ts_ms else now_ms(),
             "level": level,
             "stage": stage,
             "task_id": task_id,
@@ -78,10 +83,19 @@ class LogBus:
         stage: str = "",
         task_id: str = "",
         level: str = "",
+        start_ms: Optional[int] = None,
+        end_ms: Optional[int] = None,
         limit: int = 500,
     ) -> dict:
-        """Return matching log records (newest last) plus a summary count."""
+        """Return matching log records (ascending by timestamp) plus counts.
+
+        All filters are AND-combined. ``start_ms`` / ``end_ms`` bound the
+        record timestamp (both endpoints inclusive). Records written by older
+        versions stored their timestamp under ``ts``; those are normalised here
+        so every returned record exposes ``ts_ms``.
+        """
         needle = (search or "").lower()
+        want_level = (level or "").strip().upper()
         records: list[dict] = []
         total_scanned = 0
         for path in list_files(self._log_root(job_id), suffix=".jsonl", recursive=True):
@@ -94,18 +108,28 @@ class LogBus:
             if task_id and f_task != task_id:
                 continue
             for rec in read_jsonl_stream(path):
+                if not isinstance(rec, dict):
+                    continue
                 total_scanned += 1
-                if level and rec.get("level") != level:
+                _normalise_ts(rec)
+                rec.setdefault("stage", f_stage)
+                rec.setdefault("task_id", f_task)
+                if want_level and str(rec.get("level", "")).upper() != want_level:
+                    continue
+                ts = rec.get("ts_ms") or 0
+                if start_ms is not None and ts < start_ms:
+                    continue
+                if end_ms is not None and ts > end_ms:
                     continue
                 if needle:
                     hay = _lower_record(rec)
                     if needle not in hay:
                         continue
-                rec.setdefault("stage", f_stage)
-                rec.setdefault("task_id", f_task)
                 records.append(rec)
 
-        records.sort(key=lambda r: r.get("ts_ms", 0))
+        # Python's sort is stable, so records sharing a timestamp keep the
+        # append (scan) order rather than shuffling on every poll/refresh.
+        records.sort(key=lambda r: r.get("ts_ms") or 0)
         total = len(records)
         return {
             "total": total,
@@ -113,6 +137,22 @@ class LogBus:
             "stages": self.stages(job_id),
             "records": records[:limit],
         }
+
+
+def _normalise_ts(rec: dict) -> None:
+    """Ensure the record carries an int ``ts_ms`` timestamp.
+
+    Older log shards stored the epoch-ms value under ``ts``; normalise in
+    place so display, sorting and time-range filters all see one field.
+    """
+    ts = rec.get("ts_ms")
+    if ts is None:
+        ts = rec.get("ts")
+    try:
+        rec["ts_ms"] = int(ts) if ts is not None else 0
+    except (TypeError, ValueError):
+        rec["ts_ms"] = 0
+    rec.pop("ts", None)
 
 
 def _lower_record(rec: dict) -> str:

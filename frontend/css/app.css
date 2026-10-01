@@ -337,7 +337,7 @@ fieldset legend { font-size: 13px; font-weight: 600; color: var(--ink-2); paddin
   overflow-y: auto;
 }
 .log-line { display: flex; gap: 8px; padding: 2px 0; white-space: pre-wrap; }
-.log-line .ts { color: var(--muted); flex: 0 0 auto; }
+.log-line .ts { color: var(--muted); flex: 0 0 auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .log-line .lvl { flex: 0 0 60px; font-weight: 600; }
 .log-line.lvl-INFO .lvl { color: var(--series-1); }
 .log-line.lvl-WARN .lvl { color: var(--serious); }

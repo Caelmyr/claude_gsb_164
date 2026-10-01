@@ -52,6 +52,17 @@ const Components = (() => {
     return d.toLocaleTimeString('zh-CN', { hour12: false });
   }
 
+  // Full timestamp: YYYY-MM-DD HH:MM:SS.mmm (local time). Used by the log
+  // page, where showing only the time-of-day hides which day/second a line
+  // was emitted.
+  function fmtDateTime(ms) {
+    if (ms == null || isNaN(ms)) return '-';
+    const d = new Date(ms);
+    const p = (n, w = 2) => String(n).padStart(w, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+      `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
+  }
+
   function fmtDur(ms) {
     if (ms == null || isNaN(ms)) return '-';
     if (ms < 1000) return ms + ' ms';
@@ -193,7 +204,7 @@ const Components = (() => {
   }
 
   return {
-    PAGES, LABELS, CLASS, esc, fmtNum, fmtBytes, fmtTime, fmtDur, fmtPct,
+    PAGES, LABELS, CLASS, esc, fmtNum, fmtBytes, fmtTime, fmtDateTime, fmtDur, fmtPct,
     stateBadge, progress, meter, empty, table, renderNav, init, toast, poll, valueCell, jobPicker,
   };
 })();

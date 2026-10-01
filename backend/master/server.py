@@ -234,13 +234,31 @@ class Master:
         job, err, code = self._get_job(job_id)
         if job is None:
             return err, code
+
+        def _ms_arg(name: str):
+            raw = request.args.get(name, "").strip()
+            if not raw:
+                return None
+            try:
+                return int(raw)
+            except ValueError:
+                return None
+
+        # Frontend sends ``search``; ``q`` kept as a legacy alias.
+        search = request.args.get("search") or request.args.get("q", "")
+        try:
+            limit = max(1, min(int(request.args.get("limit", 500)), 5000))
+        except ValueError:
+            limit = 500
         result = self.logbus.query(
             job_id,
-            search=request.args.get("q", ""),
+            search=search,
             stage=request.args.get("stage", ""),
             task_id=request.args.get("task_id", ""),
             level=request.args.get("level", ""),
-            limit=int(request.args.get("limit", 500)),
+            start_ms=_ms_arg("start_ms"),
+            end_ms=_ms_arg("end_ms"),
+            limit=limit,
         )
         result["job_id"] = job_id
         return jsonify(result)
@@ -380,5 +398,6 @@ class Master:
             stage=body.get("stage", "master"),
             task_id=body.get("task_id", "job"),
             worker_id=body.get("worker_id", ""),
+            ts_ms=body.get("ts_ms"),
         )
         return jsonify({"ok": True})
