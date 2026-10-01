@@ -95,7 +95,7 @@ class ShuffleCoordinator:
         self.logbus.info(
             job.job_id,
             f"shuffle plan built: {len(map_tasks)} maps x {len(reduce_tasks)} partitions",
-            task_id="shuffle",
+            stage=C.STAGE_SHUFFLE, task_id="shuffle",
         )
 
     def mark_partition_done(self, job: Job, partition: int, fetched_bytes: int = 0) -> None:

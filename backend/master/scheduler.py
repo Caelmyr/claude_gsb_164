@@ -109,13 +109,13 @@ class Scheduler:
                     j.stats.__setitem__("shuffle_started_ms", now_ms()),
                 ))
                 self.logbus.info(job.job_id, "all map tasks finished; shuffle built",
-                                 task_id="shuffle")
+                                 stage=C.STAGE_SHUFFLE, task_id="shuffle")
         elif status == C.JOB_SHUFFLE:
             started = job.stats.get("shuffle_started_ms", 0)
             if now_ms() - started >= SHUFFLE_HOLD_MS:
                 self.job_manager.set_job_status(job, C.JOB_REDUCE)
                 self.logbus.info(job.job_id, "shuffle complete; reduce stage started",
-                                 task_id="shuffle")
+                                 stage=C.STAGE_REDUCE, task_id="shuffle")
         elif status == C.JOB_REDUCE:
             self._dispatch_tasks(job, C.TASK_REDUCE)
             reduce_tasks = self.job_manager.tasks_for(job.job_id, C.TASK_REDUCE)
@@ -187,7 +187,7 @@ class Scheduler:
         except Exception as exc:  # noqa: BLE001
             accepted = False
             self.logbus.warn(job.job_id, f"dispatch to {worker.name} failed: {exc}",
-                             task_id=task.task_id)
+                             stage=task.kind, task_id=task.task_id)
         if not accepted:
             return
 
@@ -205,7 +205,7 @@ class Scheduler:
         self.logbus.info(
             job.job_id,
             f"task {task.task_id} dispatched to {worker.name}" + (" (speculative)" if speculative else ""),
-            task_id=task.task_id, worker_id=worker.worker_id,
+            stage=task.kind, task_id=task.task_id, worker_id=worker.worker_id,
         )
 
     def _build_spec(self, job: Job, task: Task) -> dict:
@@ -296,7 +296,7 @@ class Scheduler:
             job.job_id,
             f"task {task.task_id} succeeded ({payload.get('records_processed', 0)} records, "
             f"{payload.get('duration_ms', 0)} ms)",
-            task_id=task.task_id, worker_id=worker_id,
+            stage=task.kind, task_id=task.task_id, worker_id=worker_id,
         )
         self._cancel_speculative_losers(job, task, worker_id)
 
@@ -361,4 +361,4 @@ class Scheduler:
             self.fault_tolerance.mark_speculated(job, task)
             self._dispatch(job, task, worker, speculative=True)
             self.logbus.warn(job.job_id, f"speculative copy of {task.task_id} -> {worker.name}",
-                             task_id=task.task_id)
+                             stage=task.kind, task_id=task.task_id)

@@ -57,6 +57,7 @@ class FaultTolerance:
         self.storage.write(event.to_dict(), "jobs", job.job_id, "faults", f"{event.fault_id}.json")
         self.logbus.warn(
             job.job_id, f"[{kind}] {message}",
+            stage=task.kind if task else "master",
             task_id=task.task_id if task else "job", worker_id=worker_id,
         )
         return event

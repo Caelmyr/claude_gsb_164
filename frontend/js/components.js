@@ -52,6 +52,16 @@ const Components = (() => {
     return d.toLocaleTimeString('zh-CN', { hour12: false });
   }
 
+  function fmtDateTime(ms) {
+    if (ms == null || isNaN(ms) || Number(ms) <= 0) return '-';
+    const d = new Date(Number(ms));
+    if (isNaN(d.getTime())) return '-';
+    const p2 = n => String(n).padStart(2, '0');
+    const p3 = n => String(n).padStart(3, '0');
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ` +
+      `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}.${p3(d.getMilliseconds())}`;
+  }
+
   function fmtDur(ms) {
     if (ms == null || isNaN(ms)) return '-';
     if (ms < 1000) return ms + ' ms';
@@ -193,7 +203,7 @@ const Components = (() => {
   }
 
   return {
-    PAGES, LABELS, CLASS, esc, fmtNum, fmtBytes, fmtTime, fmtDur, fmtPct,
+    PAGES, LABELS, CLASS, esc, fmtNum, fmtBytes, fmtTime, fmtDateTime, fmtDur, fmtPct,
     stateBadge, progress, meter, empty, table, renderNav, init, toast, poll, valueCell, jobPicker,
   };
 })();

@@ -177,7 +177,7 @@ class WorkerServer:
                 "worker_id": self.worker_id,
                 "job_id": spec.get("job_id", ""),
                 "task_id": spec.get("task_id", ""),
-                "stage": "task",
+                "stage": spec.get("kind", "task"),
                 "level": level,
                 "message": message,
                 "ts_ms": now_ms(),

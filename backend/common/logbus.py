@@ -36,7 +36,7 @@ class LogBus:
         **extra: Any,
     ) -> dict:
         record: dict[str, Any] = {
-            "ts": now_ms(),
+            "ts_ms": now_ms(),
             "level": level,
             "stage": stage,
             "task_id": task_id,
@@ -79,9 +79,12 @@ class LogBus:
         task_id: str = "",
         level: str = "",
         limit: int = 500,
+        start_ms: Optional[int] = None,
+        end_ms: Optional[int] = None,
     ) -> dict:
-        """Return matching log records (newest last) plus a summary count."""
+        """Return matching log records (oldest first) plus a summary count."""
         needle = (search or "").lower()
+        wanted_level = (level or "").upper()
         records: list[dict] = []
         total_scanned = 0
         for path in list_files(self._log_root(job_id), suffix=".jsonl", recursive=True):
@@ -89,20 +92,29 @@ class LogBus:
             parts = rel.split(os.sep)
             f_stage = parts[0] if len(parts) > 1 else "master"
             f_task = os.path.basename(path)[: -len(".jsonl")]
-            if stage and f_stage != stage:
-                continue
             if task_id and f_task != task_id:
                 continue
             for rec in read_jsonl_stream(path):
                 total_scanned += 1
-                if level and rec.get("level") != level:
+                if not isinstance(rec, dict):
+                    continue
+                ts_ms = _record_ts_ms(rec)
+                rec["ts_ms"] = ts_ms
+                rec["stage"] = _effective_stage(f_stage, f_task, rec.get("stage"))
+                rec.setdefault("task_id", f_task)
+
+                if stage and rec["stage"] != stage:
+                    continue
+                if wanted_level and str(rec.get("level", "")).upper() != wanted_level:
+                    continue
+                if start_ms is not None and ts_ms < start_ms:
+                    continue
+                if end_ms is not None and ts_ms > end_ms:
                     continue
                 if needle:
                     hay = _lower_record(rec)
                     if needle not in hay:
                         continue
-                rec.setdefault("stage", f_stage)
-                rec.setdefault("task_id", f_task)
                 records.append(rec)
 
         records.sort(key=lambda r: r.get("ts_ms", 0))
@@ -113,6 +125,34 @@ class LogBus:
             "stages": self.stages(job_id),
             "records": records[:limit],
         }
+
+
+def _record_ts_ms(rec: dict) -> int:
+    """Normalise current and historical log timestamp fields to epoch ms."""
+    value = rec.get("ts_ms", rec.get("ts", 0))
+    try:
+        ts = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return ts
+
+
+def _effective_stage(directory_stage: str, task_id: str, record_stage: Any) -> str:
+    """Map older log placement/values to the UI's run-stage vocabulary."""
+    stage = str(record_stage or directory_stage or "master")
+    if stage == "task":
+        if task_id.startswith("m-"):
+            return "map"
+        if task_id.startswith("r-"):
+            return "reduce"
+    if directory_stage == "master" and stage == "master":
+        if task_id.startswith("m-"):
+            return "map"
+        if task_id.startswith("r-"):
+            return "reduce"
+        if task_id == "shuffle":
+            return "shuffle"
+    return stage
 
 
 def _lower_record(rec: dict) -> str:

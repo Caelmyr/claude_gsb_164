@@ -33,6 +33,20 @@ from backend.tasks.samples import list_sample_jobs
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend"))
 
 
+def _epoch_ms_arg(value: Optional[str]) -> Optional[int]:
+    """Parse a log time filter. Empty values are unset; seconds are accepted."""
+    if not value:
+        return None
+    try:
+        ms = int(value)
+    except ValueError:
+        raise ValueError("time filters must be epoch milliseconds") from None
+    # The API documents milliseconds; tolerate second-level epoch values too.
+    if 0 < ms < 10_000_000_000:
+        ms *= 1000
+    return ms
+
+
 class Master:
     def __init__(self, data_root: str, host: str = "0.0.0.0", port: int = 8000,
                  config: Optional[ClusterConfig] = None) -> None:
@@ -234,13 +248,21 @@ class Master:
         job, err, code = self._get_job(job_id)
         if job is None:
             return err, code
+        try:
+            start_ms = _epoch_ms_arg(request.args.get("start_ms") or request.args.get("start"))
+            end_ms = _epoch_ms_arg(request.args.get("end_ms") or request.args.get("end"))
+            limit = int(request.args.get("limit", 500))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         result = self.logbus.query(
             job_id,
-            search=request.args.get("q", ""),
+            search=request.args.get("search", "") or request.args.get("q", ""),
             stage=request.args.get("stage", ""),
             task_id=request.args.get("task_id", ""),
             level=request.args.get("level", ""),
-            limit=int(request.args.get("limit", 500)),
+            start_ms=start_ms,
+            end_ms=end_ms,
+            limit=limit,
         )
         result["job_id"] = job_id
         return jsonify(result)

@@ -10,19 +10,24 @@
   <header id="app-nav"></header>
   <main class="page">
     <h1 class="page-title">日志聚合与搜索 <span>Log Aggregation &amp; Search</span></h1>
-    <p class="page-desc">跨 Worker 聚合的结构化日志，按关键词/阶段/级别过滤。Aggregated logs across workers, filtered by keyword / stage / level.</p>
+    <p class="page-desc">跨 Worker 聚合的结构化日志，按关键词/时间范围/阶段/级别组合过滤。Aggregated logs across workers, filtered by keyword / time range / stage / level.</p>
 
     <div class="flex wrap mb">
       <div id="job-picker" style="min-width:260px"></div>
-      <input id="search" placeholder="搜索关键词 Search…" style="max-width:220px">
-      <select id="stage" style="max-width:140px">
+      <input id="search" placeholder="搜索关键词 Search…" class="log-filter" style="max-width:220px">
+      <div class="log-time-range">
+        <input id="start-time" type="datetime-local" step="1" class="log-filter" aria-label="开始时间 Start time">
+        <span>—</span>
+        <input id="end-time" type="datetime-local" step="1" class="log-filter" aria-label="结束时间 End time">
+      </div>
+      <select id="stage" class="log-filter" style="max-width:140px">
         <option value="">阶段 Stage: 全部 All</option>
         <option value="master">master</option>
         <option value="map">map</option>
         <option value="shuffle">shuffle</option>
         <option value="reduce">reduce</option>
       </select>
-      <select id="level" style="max-width:130px">
+      <select id="level" class="log-filter" style="max-width:130px">
         <option value="">级别 Level: 全部 All</option>
         <option value="INFO">INFO</option>
         <option value="WARN">WARN</option>
